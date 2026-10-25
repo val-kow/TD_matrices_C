@@ -1,1 +1,27 @@
-# TD_matrices_C
+1. EN-TÊTE
+TD_matrices_C
+Membres (ID Github): MERCIER Théo (tmercier370) et KOWALSKI Valentin (val-kow)
+3A STI FISE - TD 2
+Date de Remise : ../../2026 //A COMPELETER !
+
+
+2. INTRODUCTION
+
+
+3. CONCEPTION
+
+
+4. REALISATION
+Exercice 1 :
+1.a) 
+
+1.b)
+
+
+5. VERIFICATIONS MEMOIRE
+
+
+6. DEMONSTRATION FINALE
+
+
+7. BILAN ET DIFFICULTES
