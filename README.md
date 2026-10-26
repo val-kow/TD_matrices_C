@@ -1,7 +1,10 @@
 # 1. EN-TÊTE
 TD_matrices_C
+
 Membres (ID Github): MERCIER Théo (tmercier370) et KOWALSKI Valentin (val-kow)
+
 3A STI FISE - TD 2
+
 Date de Remise : ../../2026 //A COMPLETER !
 
 
@@ -30,6 +33,7 @@ Ce qui fonctionne (ou non) à la remise :
 ```c
     case MAT_ERR_DIMENSIONS:   return "dimensions incompatibles";
     case MAT_ERR_DEPASSEMENT:  return "résultat hors de l'intervalle des int";
+```
 
 (1.b) : /* si la matrice m existe et tous ses coefs existent et si le nbre de lignes et colonnes est compris entre 1 et MAT_DIM_MAX alors retourne 1 (succès) sinon retourne 0 (ECHEC) */
 ```c
@@ -87,7 +91,7 @@ coef[2] : NULL
         free(m->coef);                              // puis on libère la matrice
     }
 ```
-
+Bilan ./test_ex1 :
 ```text
 === Exercice 1 : matrice.c ===
 [OK]    (1.a) message pour MAT_ERR_DIMENSIONS
