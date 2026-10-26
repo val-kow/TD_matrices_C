@@ -57,7 +57,8 @@ Ce qui fonctionne (ou non) à la remise :
 ```c
         coef[i] = mat_calloc((size_t)nb_colonnes, sizeof *coef[i]);    // nb_colonnes entiers
 ```
-
+Schéma des variables et ordre de libération des pointeurs :
+```text
 coef : Ox1000
 coef[0] : Ox2000
 coef[1] : Ox2008
@@ -73,6 +74,7 @@ coef : NULL
 coef[0] : NULL
 coef[1] : NULL
 coef[2] : NULL
+```
 
 (1.e) : /* Une fois les erreurs d'allocation traités, on peut assigner les coefs, lignes et colonnes dans la variable res (résultat) */
 ```c
@@ -174,6 +176,7 @@ Bilan : 16 / 16 verifications reussies.
     return MAT_OK;      // Retourne succès
 ```
 
+Bilan ./test_ex2 :
 ```text
 === Exercice 2 : affichage (verification visuelle) ===
 M (4 x 3) :
