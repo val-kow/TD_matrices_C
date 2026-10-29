@@ -93,11 +93,13 @@ int main(int argc, char *argv[])
         if (err != MAT_OK) {
             fprintf(stderr, "Erreur : %s (A : %d x %d, B : %d x %d)\n", mat_message_erreur(err), a.nb_lignes, a.nb_colonnes, b.nb_lignes, b.nb_colonnes);
             goto nettoyage;
-
-    
+        }
     // Ligne supprimée
+    /* Fin (4.b) */
 
     /* (4.c) À COMPLÉTER : afficher r (nom "R = A + B" ou "R = A x B").  */
+    addition ? mat_afficher("R = A + B", &r) : mat_afficher("R = A x B", &r);
+    /* Fin (4.c) */
 
 
     /* FOURNI : enregistrement de r dans le fichier argv[4]. */
@@ -107,6 +109,9 @@ int main(int argc, char *argv[])
     /* (4.d) À COMPLÉTER : tout a réussi :
      *         - afficher "Résultat enregistré dans \"...\"." ;
      *         - statut = EXIT_SUCCESS;                                 */
+    printf("Resultat enregistre dans \"%s\".\n", argv[4]);
+    statut = EXIT_SUCCESS;
+    /* Fin (4.d) */
 
 
 nettoyage:
@@ -117,3 +122,4 @@ nettoyage:
     mat_detruire(&a);
     return statut;
 }
+

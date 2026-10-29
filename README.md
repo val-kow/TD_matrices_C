@@ -20,8 +20,8 @@ Les objectifs du TD sont :
     - Se familiariser avec l'outil GitHub
 
 Ce qui fonctionne (ou non) à la remise :
-    - ... (OK)
-    - ... (ECHEC)
+    - OK : Tout fonctionne, aucune fuite mémoire
+    - ECHEC : Si quelque chose ne marche pas alors il n'a pas été trouvé
 
 
 # 3. CONCEPTION
@@ -306,6 +306,32 @@ Bilan ./test_ex3
 Bilan : 14 / 14 verifications reussies.
 ```
 
+## Exercice 4 :
+(4.a) : /* Affiche les matrices A et B */
+```c
+    mat_afficher("A", &a);
+    mat_afficher("B", &b);
+```
+
+(4.b) :
+```c
+    MatErreur err = addition ? mat_additionner(&a, &b, &r) : mat_multiplier(&a, &b, &r); // si addition = 1 (Vrai) effectue une addition de matrice sinon effectue une multiplication
+        if (err != MAT_OK) { 
+            fprintf(stderr, "Erreur : %s (A : %d x %d, B : %d x %d)\n", mat_message_erreur(err), a.nb_lignes, a.nb_colonnes, b.nb_lignes, b.nb_colonnes); // renvoie un message d'erreur si problème
+            goto nettoyage; // Envoie à la partie nettoyage en bas de main
+```
+
+(4.c) : /* si addition = 1 (Vrai) alors affiche en format addition sinon en format multiplication
+```c
+addition ? mat_afficher("R = A + B", &r) : mat_afficher("R = A x B", &r);
+```
+
+(4.d) : /* Affiche le lieu de stockage du résultat et quitte le programme */
+```c
+printf("Resultat enregistre dans \"%s\".\n", argv[4]);
+    statut = EXIT_SUCCESS;
+```
+
 ## Questions de réflexion
 
 **Q5.1** Le paramètre const Matrice *a empêche-t-il d’écrire a->coef[0][0] = 7; ? Que protège exactement ce const ? Que faudrait-il changer pour que le compilateur refuse cette affectation ?
@@ -348,11 +374,148 @@ En C, le dépassement d’un entier signé (int) provoque un comportement indéf
 ```
 
 ## ./test_ex3 :
-
+```text
+==599== HEAP SUMMARY:
+==599==     in use at exit: 0 bytes in 0 blocks
+==599==   total heap usage: 37 allocs, 37 frees, 1,412 bytes allocated
+==599==
+==599== All heap blocks were freed -- no leaks are possible
+```
 
 ## ./demo_matrices
+Scénario 1 : 
+```text
+valgrind --leak-check=full ./demo_matrices add donnees/A.txt donnees/B.txt R.txt :
+
+==941== HEAP SUMMARY:
+==941==     in use at exit: 0 bytes in 0 blocks
+==941==   total heap usage: 22 allocs, 22 frees, 14,968 bytes allocated
+==941==
+==941== All heap blocks were freed -- no leaks are possible
+
+$ echo $?
+0
+```
+
+Scénario 6 (Scénario d'erreur) : 
+```text`
+valgrind --leak-check=full ./demo_matrices add donnees/invalide.txt donnees/B.txt R.txt :
+
+==1241== Command: ./demo_matrices add donnees/invalide.txt donnees/B.txt R.t
+==1241==
+Erreur : lecture de "donnees/invalide.txt" : fichier mal formé
+==1241==
+==1241== HEAP SUMMARY:
+==1241==     in use at exit: 0 bytes in 0 blocks
+==1241==   total heap usage: 5 allocs, 5 frees, 4,600 bytes allocated
+==1241==
+==1241== All heap blocks were freed -- no leaks are possible
+
+$ echo $?
+1
+```
+
+Scénario 4 (Dimensions incompatibles) : 
+```text
+valgrind --leak-check=full ./demo_matrices mul donnees/A.txt donnees/B.txt R.txt :
+
+==1317== Command: ./demo_matrices mul donnees/A.txt donnees/B.txt R.txt
+==1317==
+A (4 x 3) :
+       25       48       84
+       15       33       11
+       45       88       10
+        0       12       -5
+B (4 x 3) :
+        1        2        3
+        4        5        6
+        7        8        9
+       10       11       12
+Erreur : dimensions incompatibles (A : 4 x 3, B : 4 x 3)
+==1317==
+==1317== HEAP SUMMARY:
+==1317==     in use at exit: 0 bytes in 0 blocks
+==1317==   total heap usage: 15 allocs, 15 frees, 10,320 bytes allocated
+==1317==
+==1317== All heap blocks were freed -- no leaks are possible
+
+$ echo $?
+1
+```
+
 
 # 6. DEMONSTRATION FINALE
+Scénario 2 : Multiplication de 2 matrices, pas d'erreur de dimensions possible
+```text
+$ ./demo_matrices mul donnees/A.txt donnees/C.txt R.txt
+A (4 x 3) :
+       25       48       84
+       15       33       11
+       45       88       10
+        0       12       -5
+B (3 x 2) :
+        1        0
+        0        1
+        2       -1
+R = A x B (4 x 2) :
+      193      -36
+       37       22
+       65       78
+      -10       17
+Resultat enregistre dans "R.txt".
+
+echo $?
+0
+```
+
+Scénario 5 : Erreur attendue car le fichier absent.txt n'existe pas
+```text
+$ ./demo_matrices mul donnees/A.txt absent.txt R.txt
+Erreur : impossible d'ouvrir "absent.txt" : No such file or directory
+
+$ echo $?
+1
+```
+
+Scénario 8 : Erreur attendue car le dossier fantome n'existe pas
+```text
+$ ./demo_matrices mul donnees/A.txt donnees/C.txt fantome/R.txt
+A (4 x 3) :
+       25       48       84
+       15       33       11
+       45       88       10
+        0       12       -5
+B (3 x 2) :
+        1        0
+        0        1
+        2       -1
+R = A x B (4 x 2) :
+      193      -36
+       37       22
+       65       78
+      -10       17
+Erreur : impossible de créer "fantome/R.txt" : No such file or directory
+$ echo $?
+1
+```
+
+Scénario 10 : Erreur attendue car manque d'arguments (pas de add ou de mul)
+```text
+$ ./demo_matrices donnees/A.txt donnees/C.txt R.txt
+Usage : ./demo_matrices <add|mul> <fichier_A> <fichier_B> <fichier_R>
+
+$ echo $?
+1
+```
 
 
 # 7. BILAN ET DIFFICULTES
+Le TD était très bien expliqué et nous étions très guidées (parfois même un peu trop)
+
+Répartition du travail :
+Valentin : Réalisation de l'exercice 1, 2 et 4, rédaction du compte rendu sur readme.md et test valgrind sur tous les tests et scénarios
+Théo : ...
+
+Aide utilisée :
+Valentin : IA pour des commandes GitHub pour récupérer et merge la branche de Théo
+Théo : ...
