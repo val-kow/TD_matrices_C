@@ -207,7 +207,15 @@ M (4 x 3) :
 Bilan : 14 / 14 verifications reussies.
 ```
 
-# 5. VERIFICATIONS MEMOIRE
+## Exercice 3 :
+(3.a) THEEEOEEEOEOEOOEOEOEOEOEOOE FAIT LE
+
+
+## Exercice 4 :
+
+
+
+# 5. VERIFICATIONS MEMOIRE (valgrind)
 
 ## ./test_ex1 :
 ```text
