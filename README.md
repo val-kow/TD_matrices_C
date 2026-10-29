@@ -208,19 +208,126 @@ Bilan : 14 / 14 verifications reussies.
 ```
 
 ## Exercice 3 :
-(3.a) THEEEOEEEOEOEOOEOEOEOEOEOOE FAIT LE
 
-
-## Exercice 4 :
-(4.a) : /* Affiche les matrices A et B */
+(3.a) : /* Vérifie que les deux matrices ont les mêmes dimensions avant l'addition */
 ```c
-    mat_afficher("A", &a);
-    mat_afficher("B", &b);
+    if (a->nb_lignes != b->nb_lignes || a->nb_colonnes != b->nb_colonnes) {
+        return MAT_ERR_DIMENSIONS;
+    }
 ```
 
-(4.b) : 
+(3.b) : /* Alloue une matrice résultat avec les dimensions de a */
+```c
+    Matrice r = MATRICE_VIDE;
+    err = mat_allouer(&r, a->nb_lignes, a->nb_colonnes);
+    if (err != MAT_OK) {
+        return err;
+    }
+```
 
-# 5. VERIFICATIONS MEMOIRE (valgrind)
+(3.c) : /* Calcule chaque somme en long long afin de détecter un dépassement avant la conversion en int */
+```c
+    long long s = (long long)a->coef[i][j] + b->coef[i][j];
+
+    if (!tient_dans_int(s)) {
+        mat_detruire(&r);
+        return MAT_ERR_DEPASSEMENT;
+    }
+    r.coef[i][j] = (int)s;
+```
+
+(3.d) : /* Transfère la matrice résultat à res */
+```c
+    *res = r;
+    return MAT_OK;
+```
+
+(3.e) : /* Le nombre de colonnes de a doit être égal au nombre de lignes de b */
+```c
+    if (a->nb_colonnes != b->nb_lignes) {
+        return MAT_ERR_DIMENSIONS;
+    }
+```
+
+(3.f) : /* Alloue le résultat du produit : lignes de a et colonnes de b */
+```c
+    Matrice r = MATRICE_VIDE;
+    err = mat_allouer(&r, a->nb_lignes, b->nb_colonnes);
+    if (err != MAT_OK) {
+        return err;
+    }
+```
+
+(3.g) : /* Calcule chaque coefficient du produit en additionnant les produits correspondants */
+```c
+    for (int k = 0; k < a->nb_colonnes; k++) {
+        long long p = (long long)a->coef[i][k] * b->coef[k][j];
+        if ((p > 0 && s > LLONG_MAX - p) ||
+            (p < 0 && s < LLONG_MIN - p)) {
+            mat_detruire(&r);
+            return MAT_ERR_DEPASSEMENT;
+        }
+        s += p;
+    }
+
+    if (!tient_dans_int(s)) {
+        mat_detruire(&r);
+        return MAT_ERR_DEPASSEMENT;
+    }
+    r.coef[i][j] = (int)s;
+```
+
+(3.h) : /* Transfère le résultat du produit à res */
+```c
+    *res = r;
+    return MAT_OK;
+```
+
+Bilan ./test_ex3 
+```text
+=== Exercice 3 : addition ===
+[OK]    (3.a) (2 x 3) + (3 x 2) : MAT_ERR_DIMENSIONS
+[OK]    (3.d) (2 x 3) + (2 x 3) : MAT_OK
+[OK]    (3.c) a + b est correct
+[OK]    a et b n'ont pas ete modifiees
+[OK]    (3.b) le resultat possede sa propre memoire
+[OK]    (3.c) INT_MAX + 1 : MAT_ERR_DEPASSEMENT
+=== Exercice 3 : multiplication ===
+[OK]    (3.e) (2 x 3) x (2 x 3) : MAT_ERR_DIMENSIONS
+[OK]    (3.h) (2 x 3) x (3 x 2) : MAT_OK
+[OK]    (3.g) a x c = (58 64 / 139 154)
+[OK]    (3.f) (3 x 2) x (2 x 3) donne une matrice 3 x 3
+[OK]    a et c n'ont pas ete modifiees
+[OK]    (3.g) 2 x 10^10 depasse INT_MAX : MAT_ERR_DEPASSEMENT
+=== Exercice 3 : cas particuliers ===
+[OK]    resultat = entree refuse, a reste intacte
+[OK]    (3.f) echec d'allocation : MAT_ERR_ALLOCATION, r vide
+
+Bilan : 14 / 14 verifications reussies.
+```
+
+## Questions de réflexion
+
+**Q5.1** Le paramètre const Matrice *a empêche-t-il d’écrire a->coef[0][0] = 7; ? Que protège exactement ce const ? Que faudrait-il changer pour que le compilateur refuse cette affectation ?
+
+Oui. Comme a est un pointeur vers une matrice constante, les champs de la matrice et les éléments accessibles par ce pointeur ne peuvent pas être modifiés à travers a. Le compilateur refuse donc l’affectation a->coef[0][0] = 7;. Pour permettre cette modification, il faudrait retirer const de la déclaration du paramètre, mais ce ne serait plus conforme à la règle qui impose de ne pas modifier les matrices d’entrée.
+
+**Q5.2** Pourquoi refuse-t-on l’appel mat_additionner(&a, &b, &a) alors que, mathématiquement, a ← a + b a un sens ? Que se passerait-il avec notre implémentation si on l’acceptait ?
+
+Le paramètre res doit être distinct de a et de b. La fonction de vérification des paramètres refuse donc cet appel avec MAT_ERR_ARGUMENT. Si cet alias était accepté, verifier_parametres mettrait *res à MATRICE_VIDE, ce qui viderait aussi a puisque res pointe vers a. Les données d’entrée seraient alors perdues ou invalidées avant le calcul.
+
+**Q5.3** Combien de multiplications d’entiers effectue mat_multiplier pour des matrices n × p et p × q ? Combien pour deux matrices 1000 × 1000 ?
+
+Chaque coefficient du résultat nécessite p multiplications. Le résultat contient n × q coefficients, donc le nombre total de multiplications est n × p × q. Pour deux matrices 1000 × 1000, cela donne 1000 × 1000 × 1000 = 1 000 000 000, soit un milliard de multiplications.
+
+**Q5.4** Pourquoi ne suffit-il pas de calculer int s = a + b; puis de tester s < a pour détecter un dépassement ?
+
+En C, le dépassement d’un entier signé (int) provoque un comportement indéfini. Le dépassement peut donc se produire dès le calcul a + b, avant le test, et le résultat n’est pas fiable. Il faut effectuer le calcul dans un type plus large, ici long long, puis vérifier que le résultat est compris entre INT_MIN et INT_MAX avant de le convertir en int.
+
+
+
+
+# 5. VERIFICATIONS MEMOIRE
 
 ## ./test_ex1 :
 ```text
@@ -241,16 +348,9 @@ Bilan : 14 / 14 verifications reussies.
 ```
 
 ## ./test_ex3 :
-```text
-==599== HEAP SUMMARY:
-==599==     in use at exit: 0 bytes in 0 blocks
-==599==   total heap usage: 37 allocs, 37 frees, 1,412 bytes allocated
-==599==
-==599== All heap blocks were freed -- no leaks are possible
-```
 
-## ./demo_matrices : 
 
+## ./demo_matrices
 
 # 6. DEMONSTRATION FINALE
 
