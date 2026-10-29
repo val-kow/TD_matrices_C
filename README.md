@@ -321,7 +321,7 @@ Bilan : 14 / 14 verifications reussies.
             goto nettoyage; // Envoie à la partie nettoyage en bas de main
 ```
 
-(4.c) : /* si addition = 1 (Vrai) alors affiche en format addition sinon en format multiplication
+(4.c) : /* si addition = 1 (Vrai) alors affiche en format addition sinon en format multiplication */
 ```c
 addition ? mat_afficher("R = A + B", &r) : mat_afficher("R = A x B", &r);
 ```
@@ -398,7 +398,7 @@ $ echo $?
 ```
 
 Scénario 6 (Scénario d'erreur) : 
-```text`
+```text
 valgrind --leak-check=full ./demo_matrices add donnees/invalide.txt donnees/B.txt R.txt :
 
 ==1241== Command: ./demo_matrices add donnees/invalide.txt donnees/B.txt R.t
