@@ -308,21 +308,21 @@ Bilan : 14 / 14 verifications reussies.
 
 ## Questions de réflexion
 
-**Q5.1** Le paramètre `const Matrice *a` empêche-t-il d’écrire `a->coef[0][0] = 7;` ? Que protège exactement ce `const` ? Que faudrait-il changer pour que le compilateur refuse cette affectation ?
+**Q5.1** Le paramètre const Matrice *a empêche-t-il d’écrire a->coef[0][0] = 7; ? Que protège exactement ce const ? Que faudrait-il changer pour que le compilateur refuse cette affectation ?
 
-Oui. Comme `a` est un pointeur vers une matrice constante, les champs de la matrice et les éléments accessibles par ce pointeur ne peuvent pas être modifiés à travers `a`. Le compilateur refuse donc l’affectation `a->coef[0][0] = 7;`. Pour permettre cette modification, il faudrait retirer `const` de la déclaration du paramètre, mais ce ne serait plus conforme à la règle qui impose de ne pas modifier les matrices d’entrée.
+Oui. Comme a est un pointeur vers une matrice constante, les champs de la matrice et les éléments accessibles par ce pointeur ne peuvent pas être modifiés à travers a. Le compilateur refuse donc l’affectation a->coef[0][0] = 7;. Pour permettre cette modification, il faudrait retirer const de la déclaration du paramètre, mais ce ne serait plus conforme à la règle qui impose de ne pas modifier les matrices d’entrée.
 
-**Q5.2** Pourquoi refuse-t-on l’appel `mat_additionner(&a, &b, &a)` alors que, mathématiquement, `a ← a + b` a un sens ? Que se passerait-il avec notre implémentation si on l’acceptait ?
+**Q5.2** Pourquoi refuse-t-on l’appel mat_additionner(&a, &b, &a) alors que, mathématiquement, a ← a + b a un sens ? Que se passerait-il avec notre implémentation si on l’acceptait ?
 
-Le paramètre `res` doit être distinct de `a` et de `b`. La fonction de vérification des paramètres refuse donc cet appel avec `MAT_ERR_ARGUMENT`. Si cet alias était accepté, `verifier_parametres` mettrait `*res` à `MATRICE_VIDE`, ce qui viderait aussi `a` puisque `res` pointe vers `a`. Les données d’entrée seraient alors perdues ou invalidées avant le calcul.
+Le paramètre res doit être distinct de a et de b. La fonction de vérification des paramètres refuse donc cet appel avec MAT_ERR_ARGUMENT. Si cet alias était accepté, verifier_parametres mettrait *res à MATRICE_VIDE, ce qui viderait aussi a puisque res pointe vers a. Les données d’entrée seraient alors perdues ou invalidées avant le calcul.
 
-**Q5.3** Combien de multiplications d’entiers effectue `mat_multiplier` pour des matrices `n × p` et `p × q` ? Combien pour deux matrices `1000 × 1000` ?
+**Q5.3** Combien de multiplications d’entiers effectue mat_multiplier pour des matrices n × p et p × q ? Combien pour deux matrices 1000 × 1000 ?
 
-Chaque coefficient du résultat nécessite `p` multiplications. Le résultat contient `n × q` coefficients, donc le nombre total de multiplications est `n × p × q`. Pour deux matrices `1000 × 1000`, cela donne `1000 × 1000 × 1000 = 1 000 000 000`, soit un milliard de multiplications.
+Chaque coefficient du résultat nécessite p multiplications. Le résultat contient n × q coefficients, donc le nombre total de multiplications est n × p × q. Pour deux matrices 1000 × 1000, cela donne 1000 × 1000 × 1000 = 1 000 000 000, soit un milliard de multiplications.
 
-**Q5.4** Pourquoi ne suffit-il pas de calculer `int s = a + b;` puis de tester `s < a` pour détecter un dépassement ?
+**Q5.4** Pourquoi ne suffit-il pas de calculer int s = a + b; puis de tester s < a pour détecter un dépassement ?
 
-En C, le dépassement d’un entier signé (`int`) provoque un comportement indéfini. Le dépassement peut donc se produire dès le calcul `a + b`, avant le test, et le résultat n’est pas fiable. Il faut effectuer le calcul dans un type plus large, ici `long long`, puis vérifier que le résultat est compris entre `INT_MIN` et `INT_MAX` avant de le convertir en `int`.
+En C, le dépassement d’un entier signé (int) provoque un comportement indéfini. Le dépassement peut donc se produire dès le calcul a + b, avant le test, et le résultat n’est pas fiable. Il faut effectuer le calcul dans un type plus large, ici long long, puis vérifier que le résultat est compris entre INT_MIN et INT_MAX avant de le convertir en int.
 
 
 
