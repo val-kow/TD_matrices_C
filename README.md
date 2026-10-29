@@ -212,8 +212,13 @@ Bilan : 14 / 14 verifications reussies.
 
 
 ## Exercice 4 :
+(4.a) : /* Affiche les matrices A et B */
+```c
+    mat_afficher("A", &a);
+    mat_afficher("B", &b);
+```
 
-
+(4.b) : 
 
 # 5. VERIFICATIONS MEMOIRE (valgrind)
 
@@ -236,9 +241,16 @@ Bilan : 14 / 14 verifications reussies.
 ```
 
 ## ./test_ex3 :
+```text
+==599== HEAP SUMMARY:
+==599==     in use at exit: 0 bytes in 0 blocks
+==599==   total heap usage: 37 allocs, 37 frees, 1,412 bytes allocated
+==599==
+==599== All heap blocks were freed -- no leaks are possible
+```
 
+## ./demo_matrices : 
 
-## ./demo_matrices
 
 # 6. DEMONSTRATION FINALE
 

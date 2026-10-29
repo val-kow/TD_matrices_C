@@ -78,6 +78,9 @@ int main(int argc, char *argv[])
         goto nettoyage;
 
     /* (4.a) À COMPLÉTER : afficher A et B avec mat_afficher.          */
+    mat_afficher("A", &a);
+    mat_afficher("B", &b);
+    /* Fin (4.a) */
 
 
     /* (4.b) À COMPLÉTER : calculer r.
@@ -86,8 +89,13 @@ int main(int argc, char *argv[])
      *       Si err != MAT_OK : afficher sur stderr un message utilisant
      *       mat_message_erreur(err) et les dimensions de A et de B,
      *       puis : goto nettoyage;                                    */
+     MatErreur err = addition ? mat_additionner(&a, &b, &r) : mat_multiplier(&a, &b, &r);
+        if (err != MAT_OK) {
+            fprintf(stderr, "Erreur : %s (A : %d x %d, B : %d x %d)\n", mat_message_erreur(err), a.nb_lignes, a.nb_colonnes, b.nb_lignes, b.nb_colonnes);
+            goto nettoyage;
 
-    (void)addition;   /* ligne provisoire : à supprimer en (4.b) */
+    
+    // Ligne supprimée
 
     /* (4.c) À COMPLÉTER : afficher r (nom "R = A + B" ou "R = A x B").  */
 
