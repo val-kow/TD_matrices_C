@@ -118,6 +118,25 @@ Bilan ./test_ex1 :
 Bilan : 16 / 16 verifications reussies.
 ```
 
+### Questions théoriques — Exercice 1
+
+**Q3.1** Pourquoi `mat_detruire` prend-elle un `Matrice *` et non un `Matrice` ? Que se passerait-il, pour l’appelant, avec un passage par valeur ?
+
+`mat_detruire` reçoit un pointeur pour pouvoir modifier directement la matrice de l’appelant après avoir libéré sa mémoire. Elle peut notamment remettre ses champs à `MATRICE_VIDE`. Avec un passage par valeur, seule une copie de la structure serait modifiée : la matrice de l’appelant conserverait ses anciens pointeurs, qui deviendraient invalides après la libération. L’appelant pourrait alors provoquer un accès à une mémoire libérée ou une double libération.
+
+**Q3.2** Combien d’appels à `calloc` et à `free` faut-il pour une matrice `n × p` ? Si la k-ième allocation échoue, combien de libérations `mat_allouer` doit-elle effectuer ?
+
+Il faut `n + 1` appels à `calloc` : un pour le tableau de pointeurs des lignes, puis un pour chacune des `n` lignes de `p` entiers. Si tout réussit, la destruction effectue également `n + 1` appels à `free` : un par ligne, puis un pour le tableau de pointeurs. Si la k-ième allocation échoue, les `k - 1` allocations précédentes ont réussi ; il faut donc libérer toutes ces allocations. Dans le cas où la première allocation échoue, aucune libération n’est nécessaire.
+
+**Q3.3** Appeler deux fois `free` sur la même adresse est un comportement indéfini. Pourquoi appeler deux fois `mat_detruire` sur la même matrice est-il sans danger ? Est-ce encore vrai si l’on a fait une copie `Matrice b = a;` puis appelé `mat_detruire(&a)` et `mat_detruire(&b)` ?
+
+`mat_detruire` libère les lignes et le tableau de pointeurs, puis remet la matrice à `MATRICE_VIDE`. Au deuxième appel, il n’y a donc plus de mémoire à libérer : l’appel est sans danger. En revanche, `Matrice b = a` réalise une copie superficielle : `a` et `b` contiennent les mêmes adresses. Après `mat_detruire(&a)`, les pointeurs de `b` deviennent invalides. Appeler ensuite `mat_detruire(&b)` peut donc libérer une seconde fois les mêmes adresses : cela provoque un comportement indéfini.
+
+**Q3.4** Pourquoi `mat_allouer` commence-t-elle par l’affectation `*res = MATRICE_VIDE`, avant même de vérifier les dimensions ?
+
+Cela garantit que le résultat est dans un état vide et connu dès le début de la fonction. Ainsi, si les dimensions sont invalides ou si une allocation échoue, l’appelant ne récupère pas une matrice partiellement construite ni d’anciens pointeurs. Il peut aussi appeler `mat_detruire` sans risque sur le résultat en cas d’échec.
+
+
 ## Exercice 2 :
 (2.a) : /* Affiche matrice */
 ```c
@@ -206,6 +225,25 @@ M (4 x 3) :
 
 Bilan : 14 / 14 verifications reussies.
 ```
+
+### Questions théoriques — Exercice 2
+
+**Q4.1** Pourquoi `mat_lire` remplit-elle d’abord une matrice locale avant de l’affecter à `*res` ?
+
+La matrice locale sert de zone de travail temporaire. Si la lecture d’un coefficient échoue, `mat_lire` peut détruire cette matrice sans laisser `*res` dans un état partiellement rempli. Ce n’est qu’une fois toutes les données lues correctement que la fonction transfère la matrice complète à `*res`. Cela garantit que le résultat est valide en cas de succès.
+
+**Q4.2** La lecture vérifie-t-elle que chaque ligne de la matrice est sur sa propre ligne de texte ? Est-ce gênant ? Justifiez le principe « tolérant en lecture, strict en écriture ».
+
+Non. Les conversions de `fscanf` utilisées pour lire les entiers ignorent les espaces blancs, notamment les espaces, les tabulations et les retours à la ligne. La fonction vérifie donc la présence des bons nombres d’entiers, mais pas leur répartition exacte sur les lignes. Ce n’est pas gênant pour retrouver les coefficients. La lecture est tolérante pour accepter plusieurs présentations équivalentes, tandis que l’écriture reste stricte afin de produire toujours un format canonique et prévisible.
+
+**Q4.3** Après l’appel `mat_lire(f, &m)`, le flux `f` est positionné après le dernier coefficient. Comment exploiter cette propriété pour stocker deux matrices dans un même fichier ?
+
+On peut écrire les deux matrices l’une à la suite de l’autre dans le même fichier, chacune avec son en-tête de dimensions et ses coefficients. Le premier appel à `mat_lire` lit la première matrice et laisse le flux juste après son dernier coefficient. Un deuxième appel sur le même flux lit alors les dimensions et les coefficients de la deuxième matrice, sans avoir à rouvrir ni à repositionner le fichier.
+
+**Q4.4** Pourquoi `mat_ecrire` appelle-t-elle `fflush` avant de renvoyer `MAT_OK` ? Cela dispense-t-il l’appelant de tester `fclose` ?
+
+`fflush` force l’envoi des données encore présentes dans le tampon du flux. Une erreur d’écriture peut ainsi être détectée avant que `mat_ecrire` ne renvoie `MAT_OK`. Cela ne dispense pas l’appelant de tester `fclose` : la fermeture peut elle aussi signaler une erreur, notamment lors de la finalisation des opérations d’écriture.
+
 
 ## Exercice 3 :
 
@@ -306,6 +344,24 @@ Bilan ./test_ex3
 Bilan : 14 / 14 verifications reussies.
 ```
 
+## Questions théoriques — Exercice 3
+
+**Q5.1** Le paramètre const Matrice *a empêche-t-il d’écrire a->coef[0][0] = 7; ? Que protège exactement ce const ? Que faudrait-il changer pour que le compilateur refuse cette affectation ?
+
+Oui. Comme a est un pointeur vers une matrice constante, les champs de la matrice et les éléments accessibles par ce pointeur ne peuvent pas être modifiés à travers a. Le compilateur refuse donc l’affectation a->coef[0][0] = 7;. Pour permettre cette modification, il faudrait retirer const de la déclaration du paramètre, mais ce ne serait plus conforme à la règle qui impose de ne pas modifier les matrices d’entrée.
+
+**Q5.2** Pourquoi refuse-t-on l’appel mat_additionner(&a, &b, &a) alors que, mathématiquement, a ← a + b a un sens ? Que se passerait-il avec notre implémentation si on l’acceptait ?
+
+Le paramètre res doit être distinct de a et de b. La fonction de vérification des paramètres refuse donc cet appel avec MAT_ERR_ARGUMENT. Si cet alias était accepté, verifier_parametres mettrait *res à MATRICE_VIDE, ce qui viderait aussi a puisque res pointe vers a. Les données d’entrée seraient alors perdues ou invalidées avant le calcul.
+
+**Q5.3** Combien de multiplications d’entiers effectue mat_multiplier pour des matrices n × p et p × q ? Combien pour deux matrices 1000 × 1000 ?
+
+Chaque coefficient du résultat nécessite p multiplications. Le résultat contient n × q coefficients, donc le nombre total de multiplications est n × p × q. Pour deux matrices 1000 × 1000, cela donne 1000 × 1000 × 1000 = 1 000 000 000, soit un milliard de multiplications.
+
+**Q5.4** Pourquoi ne suffit-il pas de calculer int s = a + b; puis de tester s < a pour détecter un dépassement ?
+
+En C, le dépassement d’un entier signé (int) provoque un comportement indéfini. Le dépassement peut donc se produire dès le calcul a + b, avant le test, et le résultat n’est pas fiable. Il faut effectuer le calcul dans un type plus large, ici long long, puis vérifier que le résultat est compris entre INT_MIN et INT_MAX avant de le convertir en int.
+
 ## Exercice 4 :
 (4.a) : /* Affiche les matrices A et B */
 ```c
@@ -332,23 +388,22 @@ printf("Resultat enregistre dans \"%s\".\n", argv[4]);
     statut = EXIT_SUCCESS;
 ```
 
-## Questions de réflexion
+### Questions théoriques — Exercice 4
 
-**Q5.1** Le paramètre const Matrice *a empêche-t-il d’écrire a->coef[0][0] = 7; ? Que protège exactement ce const ? Que faudrait-il changer pour que le compilateur refuse cette affectation ?
+**Q6.1** Pourquoi le message d’erreur est-il affiché par `main.c` (ou ses fonctions `static`) et non par `mat_lire` ? Pensez à un programme graphique qui réutiliserait la bibliothèque.
 
-Oui. Comme a est un pointeur vers une matrice constante, les champs de la matrice et les éléments accessibles par ce pointeur ne peuvent pas être modifiés à travers a. Le compilateur refuse donc l’affectation a->coef[0][0] = 7;. Pour permettre cette modification, il faudrait retirer const de la déclaration du paramètre, mais ce ne serait plus conforme à la règle qui impose de ne pas modifier les matrices d’entrée.
+La bibliothèque contenant `mat_lire` doit rester indépendante de l’interface du programme qui l’utilise. Elle renvoie un code d’erreur et laisse le programme appelant décider comment le présenter. Un programme en ligne de commande peut afficher un message dans le terminal, tandis qu’un programme graphique peut afficher une boîte de dialogue. Si `mat_lire` affichait elle-même le message, elle imposerait une manière de gérer les erreurs à tous ses utilisateurs.
 
-**Q5.2** Pourquoi refuse-t-on l’appel mat_additionner(&a, &b, &a) alors que, mathématiquement, a ← a + b a un sens ? Que se passerait-il avec notre implémentation si on l’acceptait ?
+**Q6.2** Pourquoi le résultat de `fclose` est-il testé dans `sauvegarder` mais pas dans `charger` ?
 
-Le paramètre res doit être distinct de a et de b. La fonction de vérification des paramètres refuse donc cet appel avec MAT_ERR_ARGUMENT. Si cet alias était accepté, verifier_parametres mettrait *res à MATRICE_VIDE, ce qui viderait aussi a puisque res pointe vers a. Les données d’entrée seraient alors perdues ou invalidées avant le calcul.
+Lors d’une sauvegarde, des données peuvent encore être dans le tampon d’écriture. Une erreur, par exemple un manque d’espace disque, peut n’être signalée qu’au moment de la fermeture du fichier. Il faut donc tester le résultat de `fclose` pour ne pas annoncer une sauvegarde réussie alors que l’écriture n’a pas été correctement finalisée. Dans `charger`, le fichier est seulement lu : il n’y a pas de données à vider depuis un tampon d’écriture, raison pour laquelle le code ne traite pas ce résultat de la même façon.
 
-**Q5.3** Combien de multiplications d’entiers effectue mat_multiplier pour des matrices n × p et p × q ? Combien pour deux matrices 1000 × 1000 ?
+**Q6.3** Dans le scénario 8, le calcul a réussi mais l’enregistrement a échoué. Combien de matrices faut-il libérer ? Vérifiez que votre programme le fait.
 
-Chaque coefficient du résultat nécessite p multiplications. Le résultat contient n × q coefficients, donc le nombre total de multiplications est n × p × q. Pour deux matrices 1000 × 1000, cela donne 1000 × 1000 × 1000 = 1 000 000 000, soit un milliard de multiplications.
+Il faut libérer les trois matrices qui sont alors détenues par le programme : les deux matrices d’entrée `a` et `b`, ainsi que la matrice résultat `r`. L’échec de l’enregistrement ne doit pas faire oublier la libération du résultat, même si le calcul a réussi. Le chemin de nettoyage doit donc détruire ces trois matrices avant de quitter le programme.
 
-**Q5.4** Pourquoi ne suffit-il pas de calculer int s = a + b; puis de tester s < a pour détecter un dépassement ?
 
-En C, le dépassement d’un entier signé (int) provoque un comportement indéfini. Le dépassement peut donc se produire dès le calcul a + b, avant le test, et le résultat n’est pas fiable. Il faut effectuer le calcul dans un type plus large, ici long long, puis vérifier que le résultat est compris entre INT_MIN et INT_MAX avant de le convertir en int.
+
 
 
 
