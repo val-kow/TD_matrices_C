@@ -25,6 +25,127 @@ Ce qui fonctionne (ou non) à la remise :
 
 
 # 3. CONCEPTION
+## 3.1 Découpage en modules
+
+Le projet est organisé en plusieurs modules afin de séparer les responsabilités et de rendre la bibliothèque réutilisable. Chaque module possède un fichier d'en-tête .h, qui présente son interface (types, constantes et prototypes), et un fichier .c, qui contient son implémentation.
+
+| Module | Rôle |
+|---|---|
+| `matrice` (`matrice.h` / `matrice.c`) | Définit le type `Matrice`, les codes d'erreur et les fonctions communes. |
+| `matrice_alloc` (`matrice_alloc.h` / `matrice_alloc.c`) | Crée et détruit les matrices en mémoire. |
+| `matrice_io` (`matrice_io.h` / `matrice_io.c`) | Lit, écrit et affiche les matrices. |
+| `matrice_calcul` (`matrice_calcul.h` / `matrice_calcul.c`) | Réalise l'addition et la multiplication de matrices. |
+| `main.c` | Contient le programme de démonstration : lecture, calcul, affichage et enregistrement du résultat. |
+
+Les programmes de test (test_ex1.c, test_ex2.c et test_ex3.c) utilisent les mêmes interfaces que main.c. Les fonctions internes à un module sont déclarées static : elles ne sont accessibles que depuis leur fichier .c. Les fichiers .h contiennent les déclarations, mais aucune définition de fonction.
+
+## 3.2 Dépendances et compilation séparée
+
+Chaque fichier .c inclut son propre fichier .h. Les en-têtes incluent les autres en-têtes dont ils ont besoin. Par exemple, matrice_io.h utilise le type FILE, donc il inclut `<stdio.h>`. Les gardes d'inclusion (#ifndef, #define, #endif) évitent qu'un même en-tête soit traité plusieurs fois.
+
+Le découpage évite les dépendances inutiles : le module matrice_calcul n'a pas besoin de connaître les fichiers et n'inclut donc pas matrice_io.h. Le module commun matrice définit notamment mat_message_erreur et mat_est_valide, qui sont utilisées par les autres modules.
+
+Chaque fichier source est compilé séparément avec gcc -c, ce qui produit un fichier objet .o. Les fichiers objets sont ensuite assemblés par l'édition de liens pour créer l'exécutable. Les fichiers .h ne sont pas compilés seuls.
+
+```bash
+# Compilation séparée
+gcc -std=c11 -Wall -Wextra -Wpedantic -g -c matrice.c
+gcc -std=c11 -Wall -Wextra -Wpedantic -g -c matrice_alloc.c
+gcc -std=c11 -Wall -Wextra -Wpedantic -g -c matrice_io.c
+gcc -std=c11 -Wall -Wextra -Wpedantic -g -c matrice_calcul.c
+gcc -std=c11 -Wall -Wextra -Wpedantic -g -c main.c
+
+# Édition de liens
+gcc main.o matrice.o matrice_alloc.o matrice_io.o matrice_calcul.o \
+    -o demo_matrices
+```
+
+Une fonction déclarée mais définie dans aucun fichier provoque une erreur d'édition de liens (undefined reference). Si une même fonction est définie dans plusieurs modules, l'édition de liens signale une définition multiple (multiple definition).
+
+## 3.3 Représentation d'une matrice
+
+Une matrice est représentée par la structure Matrice, définie dans matrice.h :
+
+```c
+typedef struct matrice {
+    int **coef;          /* coef[i][j] : coefficient ligne i, colonne j */
+    int nb_lignes;       /* 0 si la matrice est vide */
+    int nb_colonnes;     /* 0 si la matrice est vide */
+} Matrice;
+
+#define MAT_DIM_MAX 10000
+#define MATRICE_VIDE ((Matrice){ NULL, 0, 0 })
+```
+
+Le champ coef est un pointeur vers un tableau de pointeurs : chaque coef[i] pointe vers une ligne contenant nb_colonnes entiers. Les lignes sont donc allouées séparément et ne sont pas nécessairement contiguës en mémoire. Les dimensions sont conservées dans la structure, car un pointeur ne permet pas à lui seul de connaître la taille de la zone mémoire.
+
+L'accès à un coefficient se fait avec m.coef[i][j]. Les indices commencent à zéro en C. MAT_DIM_MAX fixe la dimension maximale acceptée à 10 000. MATRICE_VIDE représente une matrice qui ne possède aucune mémoire ; toute variable Matrice doit être initialisée dans cet état avant utilisation.
+
+Le choix de int ** est celui imposé par le sujet. Une autre possibilité serait de stocker tous les coefficients dans un bloc contigu (int *), avec un accès par coef[i * nb_colonnes + j]. Cette solution demande une seule allocation et peut améliorer l'utilisation du cache, mais le tableau de pointeurs a été retenu pour travailler sur les allocations à deux niveaux et leurs échecs partiels.
+
+## 3.4 Gestion des erreurs
+
+Toutes les fonctions qui peuvent échouer renvoient une valeur de type MatErreur. MAT_OK (valeur zéro) indique une réussite. Le résultat d'une fonction est transmis par un paramètre de sortie, par exemple Matrice *res, plutôt que renvoyé directement.
+
+Les matrices d'entrée sont reçues par pointeur constant (const Matrice *) : la fonction peut les lire, mais ne doit ni les modifier ni les libérer. Les fonctions de la bibliothèque n'affichent pas elles-mêmes les erreurs ; elles renvoient un code. Le programme appelant choisit ensuite comment afficher le message, à l'aide de mat_message_erreur.
+
+Les codes d'erreur définis par le sujet sont :
+
+```c
+typedef enum {
+    MAT_OK = 0,          /* succès */
+    MAT_ERR_ARGUMENT,    /* paramètre invalide */
+    MAT_ERR_ALLOCATION,  /* échec d'allocation */
+    MAT_ERR_LECTURE,     /* erreur du flux pendant la lecture */
+    MAT_ERR_FORMAT,      /* contenu mal formé ou tronqué */
+    MAT_ERR_ECRITURE,    /* erreur du flux pendant l'écriture */
+    MAT_ERR_DIMENSIONS,  /* dimensions incompatibles */
+    MAT_ERR_DEPASSEMENT  /* résultat hors de l'intervalle des int */
+} MatErreur;
+```
+
+Cette stratégie permet à l'appelant de distinguer les causes d'échec et d'éviter d'utiliser un résultat invalide.
+
+## 3.5 Propriété et durée de vie de la mémoire
+
+Les règles suivantes sont appliquées dans tous les modules afin d'éviter les fuites et les doubles libérations :
+
+- **R1 — Initialisation :** toute variable Matrice est initialisée à MATRICE_VIDE dès sa déclaration.
+- **R2 — Transfert en cas de succès :** lorsqu'une fonction renvoie MAT_OK et remplit *res, la propriété du résultat est transférée à l'appelant. Celui-ci devra appeler mat_detruire(&res).
+- **R3 — Échec :** lorsqu'une fonction échoue, *res reste égal à MATRICE_VIDE et toute mémoire allouée par la fonction est libérée. L'appelant n'a donc rien à libérer pour ce résultat.
+- **R4 — Entrées :** une fonction ne modifie et ne libère jamais une matrice reçue en entrée (const Matrice *).
+- **R5 — Paramètre de sortie :** l'ancien contenu de *res est écrasé. Si cette matrice possédait déjà de la mémoire, l'appelant doit la détruire avant l'appel. res doit être distinct des matrices d'entrée.
+- **R6 — Destruction :** mat_detruire libère la mémoire et remet la matrice à MATRICE_VIDE. Un deuxième appel est donc sans effet.
+- **R7 — Fichiers :** le code qui ouvre un fichier est responsable de sa fermeture. Les fonctions du module matrice_io reçoivent un flux déjà ouvert et ne le ferment jamais.
+
+Ces règles définissent clairement qui possède chaque matrice et à quel moment sa mémoire doit être libérée.
+
+## 3.6 Interfaces publiques
+
+Les prototypes imposés par le sujet sont regroupés dans les en-têtes correspondants :
+
+```c
+/* matrice.h */
+const char *mat_message_erreur(MatErreur code);
+int mat_est_valide(const Matrice *m);
+
+/* matrice_alloc.h */
+MatErreur mat_allouer(Matrice *res, int nb_lignes, int nb_colonnes);
+void mat_detruire(Matrice *m);
+
+/* matrice_io.h */
+MatErreur mat_lire(FILE *f, Matrice *res);
+MatErreur mat_ecrire(FILE *f, const Matrice *m);
+void mat_afficher(const char *nom, const Matrice *m);
+
+/* matrice_calcul.h */
+MatErreur mat_additionner(const Matrice *a, const Matrice *b,
+                          Matrice *res);
+MatErreur mat_multiplier(const Matrice *a, const Matrice *b,
+                         Matrice *res);
+```
+
+Les en-têtes fournis définissent le contrat des modules. Leur contenu doit être respecté par les implémentations et n'a pas à être redéfini dans main.c.
 
 
 # 4. REALISATION
@@ -120,21 +241,21 @@ Bilan : 16 / 16 verifications reussies.
 
 ### Questions théoriques — Exercice 1
 
-**Q3.1** Pourquoi `mat_detruire` prend-elle un `Matrice *` et non un `Matrice` ? Que se passerait-il, pour l’appelant, avec un passage par valeur ?
+**Q3.1** Pourquoi mat_detruire prend-elle un Matrice * et non un Matrice ? Que se passerait-il, pour l’appelant, avec un passage par valeur ?
 
-`mat_detruire` reçoit un pointeur pour pouvoir modifier directement la matrice de l’appelant après avoir libéré sa mémoire. Elle peut notamment remettre ses champs à `MATRICE_VIDE`. Avec un passage par valeur, seule une copie de la structure serait modifiée : la matrice de l’appelant conserverait ses anciens pointeurs, qui deviendraient invalides après la libération. L’appelant pourrait alors provoquer un accès à une mémoire libérée ou une double libération.
+mat_detruire reçoit un pointeur pour pouvoir modifier directement la matrice de l’appelant après avoir libéré sa mémoire. Elle peut notamment remettre ses champs à MATRICE_VIDE. Avec un passage par valeur, seule une copie de la structure serait modifiée : la matrice de l’appelant conserverait ses anciens pointeurs, qui deviendraient invalides après la libération. L’appelant pourrait alors provoquer un accès à une mémoire libérée ou une double libération.
 
-**Q3.2** Combien d’appels à `calloc` et à `free` faut-il pour une matrice `n × p` ? Si la k-ième allocation échoue, combien de libérations `mat_allouer` doit-elle effectuer ?
+**Q3.2** Combien d’appels à calloc et à free faut-il pour une matrice n × p ? Si la k-ième allocation échoue, combien de libérations mat_allouer doit-elle effectuer ?
 
-Il faut `n + 1` appels à `calloc` : un pour le tableau de pointeurs des lignes, puis un pour chacune des `n` lignes de `p` entiers. Si tout réussit, la destruction effectue également `n + 1` appels à `free` : un par ligne, puis un pour le tableau de pointeurs. Si la k-ième allocation échoue, les `k - 1` allocations précédentes ont réussi ; il faut donc libérer toutes ces allocations. Dans le cas où la première allocation échoue, aucune libération n’est nécessaire.
+Il faut n + 1 appels à calloc : un pour le tableau de pointeurs des lignes, puis un pour chacune des n lignes de p entiers. Si tout réussit, la destruction effectue également n + 1 appels à free : un par ligne, puis un pour le tableau de pointeurs. Si la k-ième allocation échoue, les k - 1 allocations précédentes ont réussi ; il faut donc libérer toutes ces allocations. Dans le cas où la première allocation échoue, aucune libération n’est nécessaire.
 
-**Q3.3** Appeler deux fois `free` sur la même adresse est un comportement indéfini. Pourquoi appeler deux fois `mat_detruire` sur la même matrice est-il sans danger ? Est-ce encore vrai si l’on a fait une copie `Matrice b = a;` puis appelé `mat_detruire(&a)` et `mat_detruire(&b)` ?
+**Q3.3** Appeler deux fois free sur la même adresse est un comportement indéfini. Pourquoi appeler deux fois mat_detruire sur la même matrice est-il sans danger ? Est-ce encore vrai si l’on a fait une copie Matrice b = a; puis appelé mat_detruire(&a) et mat_detruire(&b) ?
 
-`mat_detruire` libère les lignes et le tableau de pointeurs, puis remet la matrice à `MATRICE_VIDE`. Au deuxième appel, il n’y a donc plus de mémoire à libérer : l’appel est sans danger. En revanche, `Matrice b = a` réalise une copie superficielle : `a` et `b` contiennent les mêmes adresses. Après `mat_detruire(&a)`, les pointeurs de `b` deviennent invalides. Appeler ensuite `mat_detruire(&b)` peut donc libérer une seconde fois les mêmes adresses : cela provoque un comportement indéfini.
+mat_detruire libère les lignes et le tableau de pointeurs, puis remet la matrice à MATRICE_VIDE. Au deuxième appel, il n’y a donc plus de mémoire à libérer : l’appel est sans danger. En revanche, Matrice b = a réalise une copie superficielle : a et b contiennent les mêmes adresses. Après mat_detruire(&a), les pointeurs de b deviennent invalides. Appeler ensuite mat_detruire(&b) peut donc libérer une seconde fois les mêmes adresses : cela provoque un comportement indéfini.
 
-**Q3.4** Pourquoi `mat_allouer` commence-t-elle par l’affectation `*res = MATRICE_VIDE`, avant même de vérifier les dimensions ?
+**Q3.4** Pourquoi mat_allouer commence-t-elle par l’affectation *res = MATRICE_VIDE, avant même de vérifier les dimensions ?
 
-Cela garantit que le résultat est dans un état vide et connu dès le début de la fonction. Ainsi, si les dimensions sont invalides ou si une allocation échoue, l’appelant ne récupère pas une matrice partiellement construite ni d’anciens pointeurs. Il peut aussi appeler `mat_detruire` sans risque sur le résultat en cas d’échec.
+Cela garantit que le résultat est dans un état vide et connu dès le début de la fonction. Ainsi, si les dimensions sont invalides ou si une allocation échoue, l’appelant ne récupère pas une matrice partiellement construite ni d’anciens pointeurs. Il peut aussi appeler mat_detruire sans risque sur le résultat en cas d’échec.
 
 
 ## Exercice 2 :
@@ -228,21 +349,21 @@ Bilan : 14 / 14 verifications reussies.
 
 ### Questions théoriques — Exercice 2
 
-**Q4.1** Pourquoi `mat_lire` remplit-elle d’abord une matrice locale avant de l’affecter à `*res` ?
+**Q4.1** Pourquoi mat_lire remplit-elle d’abord une matrice locale avant de l’affecter à *res ?
 
-La matrice locale sert de zone de travail temporaire. Si la lecture d’un coefficient échoue, `mat_lire` peut détruire cette matrice sans laisser `*res` dans un état partiellement rempli. Ce n’est qu’une fois toutes les données lues correctement que la fonction transfère la matrice complète à `*res`. Cela garantit que le résultat est valide en cas de succès.
+La matrice locale sert de zone de travail temporaire. Si la lecture d’un coefficient échoue, mat_lire peut détruire cette matrice sans laisser *res dans un état partiellement rempli. Ce n’est qu’une fois toutes les données lues correctement que la fonction transfère la matrice complète à *res. Cela garantit que le résultat est valide en cas de succès.
 
 **Q4.2** La lecture vérifie-t-elle que chaque ligne de la matrice est sur sa propre ligne de texte ? Est-ce gênant ? Justifiez le principe « tolérant en lecture, strict en écriture ».
 
-Non. Les conversions de `fscanf` utilisées pour lire les entiers ignorent les espaces blancs, notamment les espaces, les tabulations et les retours à la ligne. La fonction vérifie donc la présence des bons nombres d’entiers, mais pas leur répartition exacte sur les lignes. Ce n’est pas gênant pour retrouver les coefficients. La lecture est tolérante pour accepter plusieurs présentations équivalentes, tandis que l’écriture reste stricte afin de produire toujours un format canonique et prévisible.
+Non. Les conversions de fscanf utilisées pour lire les entiers ignorent les espaces blancs, notamment les espaces, les tabulations et les retours à la ligne. La fonction vérifie donc la présence des bons nombres d’entiers, mais pas leur répartition exacte sur les lignes. Ce n’est pas gênant pour retrouver les coefficients. La lecture est tolérante pour accepter plusieurs présentations équivalentes, tandis que l’écriture reste stricte afin de produire toujours un format canonique et prévisible.
 
-**Q4.3** Après l’appel `mat_lire(f, &m)`, le flux `f` est positionné après le dernier coefficient. Comment exploiter cette propriété pour stocker deux matrices dans un même fichier ?
+**Q4.3** Après l’appel mat_lire(f, &m), le flux f est positionné après le dernier coefficient. Comment exploiter cette propriété pour stocker deux matrices dans un même fichier ?
 
-On peut écrire les deux matrices l’une à la suite de l’autre dans le même fichier, chacune avec son en-tête de dimensions et ses coefficients. Le premier appel à `mat_lire` lit la première matrice et laisse le flux juste après son dernier coefficient. Un deuxième appel sur le même flux lit alors les dimensions et les coefficients de la deuxième matrice, sans avoir à rouvrir ni à repositionner le fichier.
+On peut écrire les deux matrices l’une à la suite de l’autre dans le même fichier, chacune avec son en-tête de dimensions et ses coefficients. Le premier appel à mat_lire lit la première matrice et laisse le flux juste après son dernier coefficient. Un deuxième appel sur le même flux lit alors les dimensions et les coefficients de la deuxième matrice, sans avoir à rouvrir ni à repositionner le fichier.
 
-**Q4.4** Pourquoi `mat_ecrire` appelle-t-elle `fflush` avant de renvoyer `MAT_OK` ? Cela dispense-t-il l’appelant de tester `fclose` ?
+**Q4.4** Pourquoi mat_ecrire appelle-t-elle fflush avant de renvoyer MAT_OK ? Cela dispense-t-il l’appelant de tester fclose ?
 
-`fflush` force l’envoi des données encore présentes dans le tampon du flux. Une erreur d’écriture peut ainsi être détectée avant que `mat_ecrire` ne renvoie `MAT_OK`. Cela ne dispense pas l’appelant de tester `fclose` : la fermeture peut elle aussi signaler une erreur, notamment lors de la finalisation des opérations d’écriture.
+fflush force l’envoi des données encore présentes dans le tampon du flux. Une erreur d’écriture peut ainsi être détectée avant que mat_ecrire ne renvoie MAT_OK. Cela ne dispense pas l’appelant de tester fclose : la fermeture peut elle aussi signaler une erreur, notamment lors de la finalisation des opérations d’écriture.
 
 
 ## Exercice 3 :
@@ -390,17 +511,17 @@ printf("Resultat enregistre dans \"%s\".\n", argv[4]);
 
 ### Questions théoriques — Exercice 4
 
-**Q6.1** Pourquoi le message d’erreur est-il affiché par `main.c` (ou ses fonctions `static`) et non par `mat_lire` ? Pensez à un programme graphique qui réutiliserait la bibliothèque.
+**Q6.1** Pourquoi le message d’erreur est-il affiché par main.c (ou ses fonctions static) et non par mat_lire ? Pensez à un programme graphique qui réutiliserait la bibliothèque.
 
-La bibliothèque contenant `mat_lire` doit rester indépendante de l’interface du programme qui l’utilise. Elle renvoie un code d’erreur et laisse le programme appelant décider comment le présenter. Un programme en ligne de commande peut afficher un message dans le terminal, tandis qu’un programme graphique peut afficher une boîte de dialogue. Si `mat_lire` affichait elle-même le message, elle imposerait une manière de gérer les erreurs à tous ses utilisateurs.
+La bibliothèque contenant mat_lire doit rester indépendante de l’interface du programme qui l’utilise. Elle renvoie un code d’erreur et laisse le programme appelant décider comment le présenter. Un programme en ligne de commande peut afficher un message dans le terminal, tandis qu’un programme graphique peut afficher une boîte de dialogue. Si mat_lire affichait elle-même le message, elle imposerait une manière de gérer les erreurs à tous ses utilisateurs.
 
-**Q6.2** Pourquoi le résultat de `fclose` est-il testé dans `sauvegarder` mais pas dans `charger` ?
+**Q6.2** Pourquoi le résultat de fclose est-il testé dans sauvegarder mais pas dans charger ?
 
-Lors d’une sauvegarde, des données peuvent encore être dans le tampon d’écriture. Une erreur, par exemple un manque d’espace disque, peut n’être signalée qu’au moment de la fermeture du fichier. Il faut donc tester le résultat de `fclose` pour ne pas annoncer une sauvegarde réussie alors que l’écriture n’a pas été correctement finalisée. Dans `charger`, le fichier est seulement lu : il n’y a pas de données à vider depuis un tampon d’écriture, raison pour laquelle le code ne traite pas ce résultat de la même façon.
+Lors d’une sauvegarde, des données peuvent encore être dans le tampon d’écriture. Une erreur, par exemple un manque d’espace disque, peut n’être signalée qu’au moment de la fermeture du fichier. Il faut donc tester le résultat de fclose pour ne pas annoncer une sauvegarde réussie alors que l’écriture n’a pas été correctement finalisée. Dans charger, le fichier est seulement lu : il n’y a pas de données à vider depuis un tampon d’écriture, raison pour laquelle le code ne traite pas ce résultat de la même façon.
 
 **Q6.3** Dans le scénario 8, le calcul a réussi mais l’enregistrement a échoué. Combien de matrices faut-il libérer ? Vérifiez que votre programme le fait.
 
-Il faut libérer les trois matrices qui sont alors détenues par le programme : les deux matrices d’entrée `a` et `b`, ainsi que la matrice résultat `r`. L’échec de l’enregistrement ne doit pas faire oublier la libération du résultat, même si le calcul a réussi. Le chemin de nettoyage doit donc détruire ces trois matrices avant de quitter le programme.
+Il faut libérer les trois matrices qui sont alors détenues par le programme : les deux matrices d’entrée a et b, ainsi que la matrice résultat r. L’échec de l’enregistrement ne doit pas faire oublier la libération du résultat, même si le calcul a réussi. Le chemin de nettoyage doit donc détruire ces trois matrices avant de quitter le programme.
 
 
 
@@ -568,9 +689,13 @@ $ echo $?
 Le TD était très bien expliqué et nous étions très guidées (parfois même un peu trop)
 
 Répartition du travail :
+
 Valentin : Réalisation de l'exercice 1, 2 et 4, rédaction du compte rendu sur readme.md et test valgrind sur tous les tests et scénarios
-Théo : ...
+
+Théo : Réalisation de l'exercice 3, des questions théoriques, et de la partie conception.
 
 Aide utilisée :
+
 Valentin : IA pour des commandes GitHub pour récupérer et merge la branche de Théo
-Théo : ...
+
+Théo : IA pour des commandes Git ,et pour le style du README ( tableau, titre, etc )
