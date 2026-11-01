@@ -5,7 +5,7 @@ Membres (ID Github): MERCIER Théo (tmercier370) et KOWALSKI Valentin (val-kow)
 
 3A STI FISE - TD 2
 
-Date de Remise : ../../2026 //A COMPLETER !
+Date de Remise : 01/11/2026
 
 
 # 2. INTRODUCTION
@@ -20,7 +20,9 @@ Les objectifs du TD sont :
     - Se familiariser avec l'outil GitHub
 
 Ce qui fonctionne (ou non) à la remise :
+
     - OK : Tout fonctionne, aucune fuite mémoire
+    
     - ECHEC : Si quelque chose ne marche pas alors il n'a pas été trouvé
 
 
